@@ -1,4 +1,6 @@
 #include <iostream>
+#include <string.h>
+#include <string>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -6,19 +8,23 @@
 #include <netinet/in.h>
 // closing the connected socket
 #include <unistd.h>
-#include <string.h>
-#include <string>
 
 int main(int argc, char const* argv[])
 {
     // open a file to serve
     FILE *html_data = fopen("index.html", "r");
 
-    char response_data[1024];
-    fgets(response_data, sizeof(response_data), html_data);
+    // char response_data[1024];
+    char buffer[128];
+    char response_data[2048] = {'\0'}; //Initialize to '\0' so there's no garbage values since we will append to the end of this string
+    while(fgets(buffer, sizeof(buffer), html_data)){
+        strcat(response_data, buffer);
+    }
+    // fgets(response_data, sizeof(response_data), html_data);
 
     char http_header[2048] = "HTTP/1.0 200 OK\r\n\n";
     strcat(http_header, response_data);
+    std::cout << http_header << std::endl;
 
     // create a socket
     int server_socket;
@@ -26,7 +32,7 @@ int main(int argc, char const* argv[])
     std::cout << "Server successfully created\n";
 
     // define the server address
-    int port = 8080;
+    int port = 8001;
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(port);
@@ -45,6 +51,7 @@ int main(int argc, char const* argv[])
     while (true) 
     {
         client_socket = accept(server_socket, NULL, NULL);
+        std::cout << "socket is accepted" << std::endl;
 
         // send data to the client
         send(client_socket, http_header, sizeof(http_header), 0);
