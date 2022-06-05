@@ -51,7 +51,6 @@ int main(int argc, char const* argv[])
     while (true) 
     {
         client_socket = accept(server_socket, NULL, NULL);
-        std::cout << "socket is accepted" << std::endl;
 
         // send data to the client
         send(client_socket, http_header, sizeof(http_header), 0);

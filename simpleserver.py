@@ -1,22 +1,25 @@
 import socket           
 
-network_socket = socket.socket()        
+PORT = 8080
+SERVER = socket.gethostbyname(socket.gethostname())
+ADDR = (SERVER, PORT)
+
+
+network_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)        
 print ("Socket successfully created")
 
-port = 49153          
-
-network_socket.bind(('', port))        
-print ("socket binded to %s" %(port))
+network_socket.bind(ADDR)        
+print (f"socket binded to {SERVER}:{PORT}")
 
 network_socket.listen(5)    
 print ("socket is listening")           
 
 while True:
-    c, addr = network_socket.accept()    
+    conn, addr = network_socket.accept()    
     print ('Got connection from', addr )
     
-    c.send('Thank you for connecting'.encode())
+    conn.send('Thank you for connecting'.encode())
     
-    c.close()
+    conn.close()
     
     break

@@ -43,17 +43,17 @@ int main(int argc, char const* argv[])
         std::cout << "There was an error making a connection to the remote socket\n";
         exit(0);
     }
-    // receive data from the server
-    char server_response[1024]; // the buffer to receive
-    std::cout << "Server response length: " << sizeof(server_response) << std::endl;
-    recv(client_socket, &server_response, sizeof(server_response), 0);
 
-    // print out the server's response
-    std::cout << "Server response length: " << sizeof(server_response) << std::endl;
-    printf("Server response: %s\n", server_response);
-    std::cout << "Server response length: " << sizeof(server_response) << std::endl;
+    char request[] = "GET / HTTP/1.1\r\n\r\n";
 
-    // std::cout << "The server sent the data: " << server_response << std::endl;
+    char response[4096] = {'\0'};
+    
+    send(client_socket, request, sizeof(request), 0);
+    
+    recv(client_socket, &response, sizeof(response), 0);
+
+    // printf("Server response: %s\n", server_response);
+    std::cout << "The server sent the data: \n" << response << std::endl;
 
     // and then close the socket
     close(client_socket);

@@ -44,7 +44,7 @@ int main(int argc, char const* argv[])
         exit(0);
     }
     // receive data from the server
-    char server_response[1024]; // the buffer to receive
+    char server_response[1024] = {'\0'}; // the buffer to receive
     std::cout << "Server response length: " << sizeof(server_response) << std::endl;
     recv(network_socket, &server_response, sizeof(server_response), 0);
 
