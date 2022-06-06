@@ -22,7 +22,7 @@ int main(int argc, char const* argv[])
     }
     // fgets(response_data, sizeof(response_data), html_data);
 
-    char http_header[2048] = "HTTP/1.0 200 OK\r\n\n";
+    char http_header[2048] = "HTTP/1.1 200 OK\r\n\n";
     strcat(http_header, response_data);
     std::cout << http_header << std::endl;
 

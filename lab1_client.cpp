@@ -21,16 +21,16 @@ int main(int argc, char const* argv[])
     int port = atoi(argv[2]);
     std::cout << "Connecting to " << ip_address << " : " << port << std::endl; 
 
-    struct sockaddr_in server_address;
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(port);
-    // server_address.sin_addr.s_addr = INADDR_ANY;
-    // inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr.s_addr);
-    inet_pton(AF_INET, ip_address.c_str(), &server_address.sin_addr.s_addr);
+    struct sockaddr_in remote_address;
+    remote_address.sin_family = AF_INET;
+    remote_address.sin_port = htons(port);
+    // remote_address.sin_addr.s_addr = INADDR_ANY;
+    // inet_pton(AF_INET, "127.0.0.1", &remote_address.sin_addr.s_addr);
+    inet_pton(AF_INET, ip_address.c_str(), &remote_address.sin_addr.s_addr);
 
     // Connecting
-    bool socket_status = connect(network_socket, reinterpret_cast<struct sockaddr *>(&server_address), sizeof(server_address));
-    // bool socket_status = connect(network_socket, (struct sockaddr *)&server_address, sizeof(server_address));
+    bool socket_status = connect(network_socket, reinterpret_cast<struct sockaddr *>(&remote_address), sizeof(remote_address));
+    // bool socket_status = connect(network_socket, (struct sockaddr *)&remote_address, sizeof(remote_address));
     std::cout << "socket binded successfully" << std::endl;
 
     enum NetworkConnectStatus {

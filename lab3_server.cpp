@@ -94,6 +94,9 @@ int main(int argc, char const* argv[])
     }
 
     // send and receive
+    char server_message[1024] = "You have reached the server!\r\n";
+    send(client_socket, server_message, sizeof(server_message), 0);
+
     char buf[4096] = {'\0'};
 
     while (true)
@@ -113,8 +116,11 @@ int main(int argc, char const* argv[])
             break;
         }
 
+        std::string response = std::string(buf, 0, bytesRecv);
+
         // display message
-        std::cout << "Received: " << std::string(buf, 0, bytesRecv) << std::endl;
+        std::cout << "Received: " << std::string(buf, 0, bytesRecv);
+        if (response.compare("Close connection") == 0) break; 
 
         // resend message
         send(client_socket, buf, bytesRecv + 1, 0);
