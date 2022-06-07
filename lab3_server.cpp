@@ -94,8 +94,10 @@ int main(int argc, char const* argv[])
     }
 
     // send and receive
-    char server_message[1024] = "You have reached the server!\r\n";
-    send(client_socket, server_message, sizeof(server_message), 0);
+    // char server_message[1024] = "You have reached the server!\r\n";
+    // send(client_socket, server_message, sizeof(server_message), 0);
+    std::string server_message = "You have reached the server!\r\n";
+    send(client_socket, server_message.data(), server_message.size(), 0);
 
     char buf[4096] = {'\0'};
 
@@ -105,6 +107,7 @@ int main(int argc, char const* argv[])
         memset(buf, 0, 4096);
         // wait for the message
         int bytesRecv = recv(client_socket, buf, sizeof(buf), 0);
+
         if (bytesRecv == NetworkConnectStatus::Failed)
         {
             std::cerr << "There was a connection issue!" << std::endl;

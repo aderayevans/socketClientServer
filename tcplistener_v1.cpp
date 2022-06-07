@@ -1,4 +1,6 @@
-#include "tcplistener.hpp"
+#include "tcplistener_v1.hpp"
+#include <sstream>
+#include "menuchoice.hpp"
 
 
 TCPListener::TCPListener()
@@ -21,11 +23,12 @@ bool TCPListener::__init()
     if (!__listen()) return false;
     // accept the call
     if (!__accept()) return false;
+    
     // close the listening socket
     close(__socket);
 
-    // send welcome message
-    __send(__header.data(), __header.size());
+    // try to communicate to test the network
+    if(!__testing()) return false;
 
     return true;
 }
@@ -143,6 +146,28 @@ void TCPListener::__print_clien_info()
 
 }
 
+bool TCPListener::__testing()
+{
+    memset(__buf, 0, 4096);
+    int bytesRecv = __recv();
+    std::string response = std::string(__buf, 0, bytesRecv);
+
+    if (bytesRecv == NetworkConnectStatus::Failed)
+    {
+        std::cerr << "There was a connection issue!" << std::endl;
+        return false;
+    }
+    if (bytesRecv == 0)
+    {
+        std::cout << "The client disconnected" << std::endl;
+        return false;
+    }
+    std::cout << response;
+    // send welcome message
+    __send(__header.data(), __header.size());
+    return true;
+}
+
 int TCPListener::__recv()
 {
     return recv(__client_socket, &__buf, sizeof(__buf), 0);
@@ -160,7 +185,6 @@ void TCPListener::__run()
     {
         // clear the buffer
         memset(__buf, 0, 4096);
-        // wait for the message
         int bytesRecv = __recv();
 
         if (bytesRecv == NetworkConnectStatus::Failed)
@@ -176,13 +200,121 @@ void TCPListener::__run()
 
         std::string response = std::string(__buf, 0, bytesRecv);
 
+        RESPONSE_STATUS response_status = __processing(response);
+
+        if (response_status == RESPONSE_STATUS::quit)
+        {
+            __send(std::string("Closing connection, bye\r\n").data(), 26);
+            // break;
+        }
+        else if (response_status == RESPONSE_STATUS::blank)
+        {
+            __send(std::string("Syntax error\r\n").data(), 15);
+        }
+        else if (response_status == RESPONSE_STATUS::key_notfound)
+        {
+            __send(std::string("KEY NOTFOUND\r\n").data(), 15);
+        }
+        else if (response_status == RESPONSE_STATUS::key_existed)
+        {
+            __send(std::string("KEY EXISTED\r\n").data(), 14);
+        }
+        else if (response_status == RESPONSE_STATUS::normal)
+        {
+            __send(std::string("Command succeeded\r\n").data(), 20);
+        }
+
         // display message
-        std::cout << "Received: " << std::string(__buf, 0, bytesRecv);
-        if (response.compare("Close connection") == 0) break; 
+        // if (response.compare("Close connection") == 0) break;
 
         // resend message
-        __send(__buf, bytesRecv + 1);
+        // __send(__buf, bytesRecv + 1);
     }
     // close the socket
     close(__client_socket);
+
+}
+
+RESPONSE_STATUS TCPListener::__processing(std::string response)
+{
+    // std::cout << "Received: \"" << response << "\"";
+    // std::cout << "Size of response = " << response.size() << std::endl;
+    response.pop_back();
+    response.pop_back();
+    std::vector<std::string> __argv = get_argv(response, ' ');
+    int __argc = __argv.size();
+    // std::cout << "Number of arguments = " << __argc << std::endl;
+
+    // check argv
+    if (__argc < 1)
+    {
+        return RESPONSE_STATUS::blank;
+    }
+
+
+    switch(hashTheChoice(__argv[0]))
+    {
+        case menuChoice::quit:
+            return RESPONSE_STATUS::quit;
+        case menuChoice::help:
+            __send(getMenu().data(), getMenu().size());
+            return RESPONSE_STATUS::normal;
+        case menuChoice::get:
+            if (__argc != 2)
+                return RESPONSE_STATUS::blank;
+            
+            if (!__get(__argv[1]))
+                return RESPONSE_STATUS::key_notfound;
+            break;
+        case menuChoice::put:
+            if (__argc != 3)
+                return RESPONSE_STATUS::blank;
+            if (!__put(__argv[1], __argv[2]))
+                return RESPONSE_STATUS::key_existed;
+            break;
+        case menuChoice::del:
+            if (__argc != 2)
+                return RESPONSE_STATUS::blank;
+            if (!__del(__argv[1]))
+                return RESPONSE_STATUS::key_notfound;
+            break;
+        case menuChoice::wrong:
+            return RESPONSE_STATUS::blank;
+            break;
+    }
+        
+    return RESPONSE_STATUS::normal;
+}
+
+std::vector<std::string> TCPListener::get_argv(std::string big_string, char split)
+{
+    std::string temp_string;
+    std::vector<std::string> __vector;
+    std::stringstream ss(big_string);
+    while (std::getline(ss, temp_string, split))
+        __vector.push_back(temp_string);
+    return __vector;
+}
+
+bool TCPListener::__get(std::string key)
+{
+    if (__database.empty()) return false;
+    if (__database.count(key) == 0) return false;
+
+    __send((__database[key] + "\r\n").data(), __database[key].size() + 2);
+    return true;
+}
+
+bool TCPListener::__put(std::string  key, std::string val)
+{
+    if (__database.count(key) > 0) return false;
+
+    __database[key] = val;
+    return true;
+}
+
+bool TCPListener::__del(std::string key)
+{
+    if (__database.empty()) return false;
+    return __database.erase(key);
 }

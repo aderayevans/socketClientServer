@@ -1,4 +1,4 @@
-#include "tcpclient.hpp"
+#include "tcpclient_v1.hpp"
 
 
 TCPClient::TCPClient()
@@ -19,9 +19,26 @@ bool TCPClient::__init()
     // connect to a server
     if (!__connect()) return false;
 
+    // try to communicate to test the network
+    if(!__testing()) return false;
+
+
+    return true;
+}
+
+bool TCPClient::__testing()
+{
     // send request message
     __send(__header.data(), __header.size());
 
+    int bytesRecv = __recv();
+    while (bytesRecv <= 0)
+    {
+        memset(__recv_buf, 0, 4096);
+        __send(__header.data(), __header.size());
+        bytesRecv = __recv();
+    }
+    std::cout << std::string(__recv_buf, 0, bytesRecv);
     return true;
 }
 
@@ -80,6 +97,20 @@ void TCPClient::__run()
         memset(__recv_buf, 0, 4096);
         // memset(send_buf, 0, 4096);
 
+        // wait for input
+        // std::cin >> send_buf;
+		std::getline(std::cin, __send_buf);
+        __send_buf += "\r\n";
+        // if (__send_buf.compare("QUIT\r\n") == 0) 
+        // {
+        //     __send(std::string("Close connection\r\n").data(), 19);
+        //     break;
+        // }
+        __send(__send_buf.data(), __send_buf.size());
+        // std::cout << "Sending " << send_buf;
+
+
+
         // wait for the message
         int bytesRecv = __recv();
 
@@ -93,19 +124,14 @@ void TCPClient::__run()
             std::cout << "The server disconnected" << std::endl;
             break;
         }
-        std::cout << "Received: " << std::string(__recv_buf, 0, bytesRecv);
 
-        // wait for input
-        // std::cin >> send_buf;
-		std::getline(std::cin, __send_buf);
-        __send_buf += "\r\n";
-        if (__send_buf.compare("QUIT\r\n") == 0) 
+        std::string response = std::string(__recv_buf, 0, bytesRecv);
+        std::cout << "Received: " << response;
+        if (response.compare("Closing connection, bye\r\n") == 0)
         {
-            __send(std::string("Close connection\r\n").data(), 19);
+            __send("", 0);
             break;
         }
-        __send(__send_buf.data(), __send_buf.size());
-        // std::cout << "Sending " << send_buf;
     }
     // close the socket
     close(__socket);

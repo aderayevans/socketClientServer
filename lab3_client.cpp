@@ -48,8 +48,10 @@ int main(int argc, char const* argv[])
     // char send_buf[4096] = {'\0'};
     char recv_buf[4096] = {'\0'};
     std::string send_buf;
-    char request[] = "GET / HTTP/1.1\r\n\r\n";
-    send(client_socket, request, sizeof(request), 0);
+    // char request[] = "GET / HTTP/1.1\r\n\r\n";
+    // send(client_socket, request, sizeof(request), 0);
+    std::string request = "GET / HTTP/1.1\r\n\r\n";
+    send(client_socket, request.data(), request.size(), 0);
 
     while (true)
     {

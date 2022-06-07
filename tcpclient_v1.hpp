@@ -1,5 +1,5 @@
-#ifndef TCPLISTENER_HPP
-#define TCPLISTENER_HPP
+#ifndef TCPCLIENT_HPP
+#define TCPCLIENT_HPP
 
 #include <iostream>
 #include <string>
@@ -21,29 +21,27 @@ enum NetworkConnectStatus {
     Failed = -1
 };
 
-class TCPListener
+class TCPClient
 {
 public:
-    TCPListener();
-    TCPListener(const char*, const char*);
+    TCPClient();
+    TCPClient(const char*, const char*);
     bool __init();
     void __run();
     bool __create_socket();
-    bool __bind();
-    bool __listen();
     void __define_address();
-    bool __accept();
+    bool __connect();
     int __recv();
     void __send(char*, int);
-    void __print_clien_info();
+    bool __testing();
 
 private:
     const char* raw_port, * raw_ip_addr;
-    std::string __header = "HTTP/1.1 200 OK\r\n\n";
-    // char server_message[1024] = "You have reached the server!\r\n";
-    sockaddr_in __address, __client_address;
-    int __socket, __client_socket;
-    char __buf[4096] = {'\0'};
+    std::string __header = "GET / HTTP/1.1\r\n\r\n";
+    sockaddr_in __remote_address;
+    int __socket;
+    char __recv_buf[4096] = {'\0'};
+    std::string __send_buf;
 };
 
 #endif
