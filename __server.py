@@ -1,25 +1,45 @@
-import socket           
+import socket 
+import threading
+import sys
 
-PORT = 8080
-SERVER = socket.gethostbyname(socket.gethostname())
+HEADER = 64
+PORT = int(sys.argv[2])
+SERVER = socket.gethostbyname(sys.argv[1])
 ADDR = (SERVER, PORT)
+FORMAT = 'utf-8'
+DISCONNECT_MESSAGE = "!DISCONNECT"
 
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind(ADDR)
 
-network_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)        
-print ("Socket successfully created")
+def handle_client(conn, addr):
+    print(f"[NEW CONNECTION] {addr} connected.")
 
-network_socket.bind(ADDR)        
-print (f"socket binded to {SERVER}:{PORT}")
+    connected = True
+    while connected:
+        msg_length = conn.recv(HEADER).decode(FORMAT)
+        print(f"{msg_length}")
+        if msg_length:
+            msg_length = int(msg_length)
+            msg = conn.recv(msg_length).decode(FORMAT)
+            if msg == DISCONNECT_MESSAGE:
+                connected = False
 
-network_socket.listen(5)    
-print ("socket is listening")           
+            print(f"[{addr}] {msg}")
+            conn.send("Msg received".encode(FORMAT))
 
-while True:
-    conn, addr = network_socket.accept()    
-    print ('Got connection from', addr )
-    
-    conn.send('Thank you for connecting'.encode())
-    
     conn.close()
-    
-    break
+        
+
+def start():
+    server.listen()
+    print(f"[LISTENING] Server is listening on {SERVER}:{PORT}")
+    while True:
+        conn, addr = server.accept()
+        thread = threading.Thread(target=handle_client, args=(conn, addr))
+        thread.start()
+        print(f"[ACTIVE CONNECTIONS] {threading.active_count() - 1}")
+
+
+print("[STARTING] server is starting...")
+start()

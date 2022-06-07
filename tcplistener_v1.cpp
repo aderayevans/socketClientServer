@@ -116,11 +116,11 @@ bool TCPListener::__accept()
         return false;
     }
 
-    __print_clien_info();
+    __print_client_info();
     return true;
 }
 
-void TCPListener::__print_clien_info()
+void TCPListener::__print_client_info()
 {
     char host[NI_MAXHOST] = {'\0'};
     char service[NI_MAXSERV] = {'\0'};
@@ -148,7 +148,7 @@ void TCPListener::__print_clien_info()
 
 bool TCPListener::__testing()
 {
-    memset(__buf, 0, 4096);
+    memset(__buf, 0, BUFFER_SIZE);
     int bytesRecv = __recv();
     std::string response = std::string(__buf, 0, bytesRecv);
 
@@ -184,9 +184,8 @@ void TCPListener::__run()
     while (true)
     {
         // clear the buffer
-        memset(__buf, 0, 4096);
+        memset(__buf, 0, BUFFER_SIZE);
         int bytesRecv = __recv();
-
         if (bytesRecv == NetworkConnectStatus::Failed)
         {
             std::cerr << "There was a connection issue!" << std::endl;
@@ -219,7 +218,8 @@ void TCPListener::__run()
         {
             __send(std::string("KEY EXISTED\r\n").data(), 14);
         }
-        else if (response_status == RESPONSE_STATUS::normal)
+        // else if (response_status == RESPONSE_STATUS::normal)
+        else
         {
             __send(std::string("Command succeeded\r\n").data(), 20);
         }
@@ -230,9 +230,7 @@ void TCPListener::__run()
         // resend message
         // __send(__buf, bytesRecv + 1);
     }
-    // close the socket
     close(__client_socket);
-
 }
 
 RESPONSE_STATUS TCPListener::__processing(std::string response)

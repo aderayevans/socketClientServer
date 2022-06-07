@@ -25,18 +25,23 @@ enum NetworkConnectStatus {
 enum class RESPONSE_STATUS
 {
     quit,
-    disconnect,
     blank,
     key_notfound,
     key_existed,
     normal
 };
 
+const int BUFFER_SIZE = 1024;
+
 class TCPListener
 {
 public:
     TCPListener();
     TCPListener(const char*, const char*);
+    ~TCPListener()
+    {
+        delete raw_ip_addr, raw_port;
+    }
     bool __init();
     bool __create_socket();
     bool __bind();
@@ -45,7 +50,7 @@ public:
     bool __accept();
     int __recv();
     void __send(char*, int);
-    void __print_clien_info();
+    void __print_client_info();
 
     bool __testing();
     void __run();
@@ -61,7 +66,7 @@ private:
     // char server_message[1024] = "You have reached the server!\r\n";
     sockaddr_in __address, __client_address;
     int __socket, __client_socket;
-    char __buf[4096] = {'\0'};
+    char __buf[BUFFER_SIZE] = {'\0'};
     std::unordered_map<std::string, std::string> __database;
 };
 

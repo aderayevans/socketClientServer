@@ -34,7 +34,7 @@ bool TCPClient::__testing()
     int bytesRecv = __recv();
     while (bytesRecv <= 0)
     {
-        memset(__recv_buf, 0, 4096);
+        memset(__recv_buf, 0, 1024);
         __send(__header.data(), __header.size());
         bytesRecv = __recv();
     }
@@ -94,7 +94,7 @@ void TCPClient::__run()
     {
         // clear the buffer
         __send_buf.clear();
-        memset(__recv_buf, 0, 4096);
+        memset(__recv_buf, 0, 1024);
         // memset(send_buf, 0, 4096);
 
         // wait for input
@@ -129,7 +129,7 @@ void TCPClient::__run()
         std::cout << "Received: " << response;
         if (response.compare("Closing connection, bye\r\n") == 0)
         {
-            __send("", 0);
+            __send(std::string("").data(), 0);
             break;
         }
     }
