@@ -33,6 +33,7 @@ public:
     bool __connect();
     int __recv();
     void __send(char*, int);
+    bool __testing();
 
 private:
     const char* raw_port, * raw_ip_addr;

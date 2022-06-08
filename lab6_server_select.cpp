@@ -53,18 +53,20 @@ int main(int argc, char** argv)
         // because select is destructive
         ready_sockets = current_sockets;
 
-        if (select(server_socket, &ready_sockets, NULL, NULL, NULL) < 0)
+        if (select(server_socket + 1, &ready_sockets, NULL, NULL, NULL) < 0)
         {
             perror("select error");
             exit(EXIT_FAILURE);
         }
+        std::cout << "selected " << server_socket << std::endl;
 
-        for (int i = 0; i < server_socket; i++)
+        for (int i = 0; i <= max_socket_so_far; i++)
         {
             if (FD_ISSET(i, &ready_sockets))
             {
                 if (i == server_socket)
                 {
+                    std::cout << "accepting" << std::endl;
                     // this is a new connection
                     int client_socket = accept_new_connection(server_socket);
                     FD_SET(client_socket, &current_sockets);
