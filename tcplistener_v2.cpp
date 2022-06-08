@@ -229,6 +229,8 @@ void TCPListener::__run()
     fd_set read_sockets;
     int max_socket_so_far, __tmp_socket, __new_socket;
 
+    timeout.tv_sec = 15;
+    timeout.tv_usec = 0;
 
     std::cout << "Listening, waiting for connections . . .\n";
 
@@ -261,9 +263,9 @@ void TCPListener::__run()
 
         if (select(max_socket_so_far + 1, &read_sockets, NULL, NULL, NULL) < 0)
         {
-            std::cerr << "select error" << std::endl;
-            break;
-            // exit(EXIT_FAILURE);
+            std::cerr << "[Select error]" << std::endl;
+            // break;
+            exit(EXIT_FAILURE);
         }
 
         std::cout << "[Selected socket]: " << max_socket_so_far << std::endl;
