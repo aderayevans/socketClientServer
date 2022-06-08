@@ -108,7 +108,7 @@ int TCPListener::__accept(sockaddr_in & __client_address)
     return __client_socket;
 }
 
-void TCPListener::__print_client_info(int __client_socket, sockaddr_in __client_address)
+void TCPListener::__print_client_info(ClientPacket &__client_packet, sockaddr_in __client_address)
 {
     char host[NI_MAXHOST] = {'\0'};
     char service[NI_MAXSERV] = {'\0'};
@@ -131,7 +131,8 @@ void TCPListener::__print_client_info(int __client_socket, sockaddr_in __client_
         inet_ntop(AF_INET, &__client_address.sin_addr, host, NI_MAXHOST);
         std::cout << host << " connected on " << ntohs(__client_address.sin_port) << std::endl;
     }
-
+    __client_packet.host = host;
+    __client_packet.service = service;
 }
 
 bool TCPListener::__testing(int __client_socket)
@@ -163,14 +164,14 @@ void TCPListener::__send(int __client_socket, char *msg, int len)
     send(__client_socket, msg, len, 0);
 }
 
-bool TCPListener::handle_connection(int __client_socket)
+bool TCPListener::handle_connection(ClientPacket __client_packet)
 {
     // send and receive
     // while (true)
     {
         // clear the buffer
         memset(__buf, 0, BUFFER_SIZE);
-        int bytesRecv = __recv(__client_socket);
+        int bytesRecv = __recv(__client_packet.__client_socket);
 
         if (!__check(bytesRecv, "There was a connection issue!")) return false;
 
@@ -182,29 +183,29 @@ bool TCPListener::handle_connection(int __client_socket)
 
         std::string response = std::string(__buf, 0, bytesRecv);
 
-        RESPONSE_STATUS response_status = __processing(__client_socket, response);
+        RESPONSE_STATUS response_status = __processing(__client_packet, response);
 
         if (response_status == RESPONSE_STATUS::quit)
         {
-            __send(__client_socket, std::string("Closing connection, bye\r\n").data(), 26);
+            __send(__client_packet.__client_socket, std::string("Closing connection, bye\r\n").data(), 26);
             return false;
         }
         else if (response_status == RESPONSE_STATUS::blank)
         {
-            __send(__client_socket, std::string("Syntax error\r\n").data(), 15);
+            __send(__client_packet.__client_socket, std::string("Syntax error\r\n").data(), 15);
         }
         else if (response_status == RESPONSE_STATUS::key_notfound)
         {
-            __send(__client_socket, std::string("KEY NOTFOUND\r\n").data(), 15);
+            __send(__client_packet.__client_socket, std::string("KEY NOTFOUND\r\n").data(), 15);
         }
         else if (response_status == RESPONSE_STATUS::key_existed)
         {
-            __send(__client_socket, std::string("KEY EXISTED\r\n").data(), 14);
+            __send(__client_packet.__client_socket, std::string("KEY EXISTED\r\n").data(), 14);
         }
         // else if (response_status == RESPONSE_STATUS::normal)
         else
         {
-            __send(__client_socket, std::string("Command succeeded\r\n").data(), 20);
+            __send(__client_packet.__client_socket, std::string("Command succeeded\r\n").data(), 20);
         }
 
         // display message
@@ -225,12 +226,19 @@ bool FD_IS_ANY_SET(fd_set const *fdset)
 
 void TCPListener::__run()
 {
-    std::vector<int> __client_sockets(MAX_CLIENTS, 0);
+    // std::vector<int> __client_sockets(MAX_CLIENTS, 0);
+
+    std::array<ClientPacket, MAX_CLIENTS> __client_packets;
+    ClientPacket __tmp_packet;
+
+    for (auto &val:__client_packets)
+        val.__client_socket = 0;
+
     fd_set read_sockets;
     int max_socket_so_far, __tmp_socket, __new_socket;
 
-    timeout.tv_sec = 15;
-    timeout.tv_usec = 0;
+    // timeout.tv_sec = 15;
+    // timeout.tv_usec = 0;
 
     std::cout << "Listening, waiting for connections . . .\n";
 
@@ -249,7 +257,7 @@ void TCPListener::__run()
 
         for (int i = 0; i < MAX_CLIENTS; ++i)
         {
-            __tmp_socket = __client_sockets[i];
+            __tmp_socket = __client_packets[i].__client_socket;
 
             if (__tmp_socket > 0)
             {
@@ -268,52 +276,58 @@ void TCPListener::__run()
             exit(EXIT_FAILURE);
         }
 
-        std::cout << "[Selected socket]: " << max_socket_so_far << std::endl;
+        std::cout << "[max_socket_so_far]: " << max_socket_so_far << std::endl;
         
         if (FD_ISSET(__socket, &read_sockets))
         {
             // this is a new connection
             // accept the call
-            std::cout << "[Accepting]: " << max_socket_so_far << std::endl;
             sockaddr_in __client_address;
             __new_socket = __accept(__client_address);
-            if (!__check(max_socket_so_far, "Problem with client connecting!"))
+            std::cout << "[Accepted]: " << __new_socket << std::endl;
+            if (!__check(__new_socket, "Problem with client connecting!"))
                 continue;
-            __print_client_info(max_socket_so_far, __client_address);
+            ClientPacket __new_packet;
+            __new_packet.__client_socket = __new_socket;
+            __print_client_info(__new_packet, __client_address);
 
             // try to communicate to test the network
             if(!__testing(__new_socket)) return;
 
             for (int i = 0; i < MAX_CLIENTS; ++i)
             {
-                if (__client_sockets[i] == 0)
+                if (__client_packets[i].__client_socket == 0)
                 {
-                    __client_sockets[i] = __new_socket;
+                    __client_packets[i] = __new_packet;
                     std::cout << "[Adding socket]: " << __new_socket << std::endl;
                     break;
                 }
             }
         }
 
-        for (int i = 0; i < MAX_CLIENTS; ++i)
+        for (int i = 0; i < max_socket_so_far; ++i)
         {
-            __tmp_socket = __client_sockets[i];
+            __tmp_packet = __client_packets[i];
 
-            if (FD_ISSET(__tmp_socket, &read_sockets))
+            if (FD_ISSET(__tmp_packet.__client_socket, &read_sockets))
             {
-                std::cout << "[Handling]: " << __tmp_socket << std::endl;
-                if (!handle_connection(__tmp_socket))
+                std::cout << "[Handling]: " << __tmp_packet.__client_socket << std::endl;
+                if (!handle_connection(__tmp_packet))
                 {
-                    std::cout << "[Disconnecting host]: " << __tmp_socket << std::endl;
-                    close(__tmp_socket);
-                    __client_sockets[i] = 0;
+                    std::cout << "[Disconnecting host]: " << __tmp_packet.__client_socket << std::endl;
+                    close(__tmp_packet.__client_socket);
+                    __client_packets[i].__client_socket = 0;
                 }
+            }
+            else
+            {
+                std::cout << "[Not Handling]: " << __tmp_packet.__client_socket << std::endl;
             }
         }
     }
 }
 
-RESPONSE_STATUS TCPListener::__processing(int __client_socket, std::string response)
+RESPONSE_STATUS TCPListener::__processing(ClientPacket __client_packet, std::string response)
 {
     // std::cout << "Received: \"" << response << "\"";
     // std::cout << "Size of response = " << response.size() << std::endl;
@@ -335,25 +349,25 @@ RESPONSE_STATUS TCPListener::__processing(int __client_socket, std::string respo
         case menuChoice::quit:
             return RESPONSE_STATUS::quit;
         case menuChoice::help:
-            __send(__client_socket, getMenu().data(), getMenu().size());
+            __send(__client_packet.__client_socket, getMenu().data(), getMenu().size());
             return RESPONSE_STATUS::normal;
         case menuChoice::get:
             if (__argc != 2)
                 return RESPONSE_STATUS::blank;
             
-            if (!__get(__client_socket, __argv[1]))
+            if (!__get(__client_packet.__client_socket, __argv[1]))
                 return RESPONSE_STATUS::key_notfound;
             break;
         case menuChoice::put:
             if (__argc != 3)
                 return RESPONSE_STATUS::blank;
-            if (!__put(__argv[1], __argv[2]))
+            if (!__put(__client_packet, __argv[1], __argv[2]))
                 return RESPONSE_STATUS::key_existed;
             break;
         case menuChoice::del:
             if (__argc != 2)
                 return RESPONSE_STATUS::blank;
-            if (!__del(__argv[1]))
+            if (!__del(__client_packet, __argv[1]))
                 return RESPONSE_STATUS::key_notfound;
             break;
         case menuChoice::wrong:
@@ -379,20 +393,40 @@ bool TCPListener::__get(int __client_socket, std::string key)
     if (__database.empty()) return false;
     if (__database.count(key) == 0) return false;
 
-    __send(__client_socket, (__database[key] + "\r\n").data(), __database[key].size() + 2);
+    __send(__client_socket, (__database[key].second + "\r\n").data(), __database[key].second.size() + 2);
     return true;
 }
 
-bool TCPListener::__put(std::string  key, std::string val)
+bool TCPListener::__put(ClientPacket __client_packet, std::string key, std::string val)
 {
     if (__database.count(key) > 0) return false;
-
-    __database[key] = val;
+    std::pair<ClientPacket, std::string> __pair;
+    __pair.first = __client_packet;
+    __pair.second = val;
+    __database[key] = __pair;
     return true;
 }
 
-bool TCPListener::__del(std::string key)
+bool TCPListener::__del(ClientPacket __client_packet, std::string key)
 {
     if (__database.empty()) return false;
+    for (auto author:__database)
+    {
+        if (author.first == key)
+        {
+            if (author.second.first.host != __client_packet.host)
+            {
+                __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
+                return false;
+            }
+            if (author.second.first.service != __client_packet.service)
+            {
+                __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
+                return false;
+            }
+            break;
+        }
+    }
+
     return __database.erase(key);
 }

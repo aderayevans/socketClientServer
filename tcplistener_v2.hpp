@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <array>
 #include <string.h>
 #include <unordered_map>
 
@@ -31,6 +32,19 @@ enum class RESPONSE_STATUS
     normal
 };
 
+struct ClientPacket
+{
+    // void operator = (const ClientPacket A)
+    // {
+    //     __client_socket = A.__client_socket;
+    //     host = A.host;
+    //     service = A.service;
+    // }
+    int __client_socket;
+    std::string host;
+    std::string service;
+};
+
 const int BUFFER_SIZE = 1024;
 const int MAX_CLIENTS = 100;
 
@@ -46,19 +60,19 @@ public:
     bool __listen();
     void __define_address();
     void __run();
-    bool handle_connection(int);
+    bool handle_connection(ClientPacket);
     int __accept(sockaddr_in &);
     int __recv(int);
     void __send(int, char*, int);
-    void __print_client_info(int, sockaddr_in);
+    void __print_client_info(ClientPacket&, sockaddr_in);
     bool __check(int, const char *);
 
     bool __testing(int);
     std::vector<std::string> get_argv(std::string, char);
-    RESPONSE_STATUS __processing(int, std::string);
+    RESPONSE_STATUS __processing(ClientPacket, std::string);
     bool __get(int, std::string);
-    bool __put(std::string, std::string);
-    bool __del(std::string);
+    bool __put(ClientPacket, std::string, std::string);
+    bool __del(ClientPacket, std::string);
 
 private:
     const char* raw_port, * raw_ip_addr;
@@ -68,7 +82,7 @@ private:
     sockaddr_in __address;
     int __socket;
     char __buf[BUFFER_SIZE] = {'\0'};
-    std::unordered_map<std::string, std::string> __database;
+    std::unordered_map<std::string, std::pair<ClientPacket, std::string>> __database;
     timeval timeout;
 
 };
