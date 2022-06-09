@@ -1,4 +1,8 @@
-#include "tcplistener.hpp"
+#include "tcplistener_v2.hpp"
+#include <sstream>
+#include <algorithm>
+#include <iterator>
+#include "menuchoice.hpp"
 
 
 TCPListener::TCPListener()
@@ -11,7 +15,7 @@ TCPListener::TCPListener(const char* ip_addr, const char* port)
 {
 }
 
-bool TCPListener::__init()
+bool TCPListener::__setup_server()
 {
     // create a socket
     if (!__create_socket()) return false;
@@ -19,13 +23,12 @@ bool TCPListener::__init()
     if (!__bind()) return false;
     // mark the socket for listening
     if (!__listen()) return false;
-    // accept the call
-    if (!__accept()) return false;
-    // close the listening socket
-    close(__socket);
+    return true;
+}
 
-    // send welcome message
-    __send(__header.data(), __header.size());
+bool TCPListener::__init()
+{
+    if (!__setup_server()) return false;
 
     return true;
 }
@@ -54,13 +57,8 @@ bool TCPListener::__create_socket()
         ...
 
     */
-    if ((this->__socket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP)) 
-            == NetworkConnectStatus::Failed)
-    {
-        std::cerr << "Can't create a socket" << std::endl;
-		return false;
-    }
-    return true;
+    return __check(this->__socket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP), 
+                    "Can't create a socket");
 }
 
 void TCPListener::__define_address()
@@ -79,45 +77,40 @@ bool TCPListener::__bind()
 {
     __define_address();
     
-    if (bind(__socket, reinterpret_cast<sockaddr *>(&__address), sizeof(__address))
-        == NetworkConnectStatus::Failed)
+    return __check(bind(__socket, reinterpret_cast<sockaddr *>(&__address), sizeof(__address)),
+                "Can't bind to IP/PORT");
+}
+
+bool TCPListener::__check(int exp, const char *msg)
+{
+    if (exp == SOCKETERROR)
     {
-        std::cerr << "Can't bind to IP/PORT" << std::endl;
-		return false;
+        // perror(msg);
+        std::cerr << msg << std::endl;
+        return false;
+        // exit(EXIT_FAILURE);
     }
     return true;
 }
 
 bool TCPListener::__listen()
 {
-    if (listen(__socket, SOMAXCONN) == NetworkConnectStatus::Failed)
-    {
-        std::cerr << "Can't listen!" << std::endl;
-		return false;
-    }
-    return true;
+    return __check(listen(__socket, server_backlog),
+                "Can't listen!");
 }
 
-bool TCPListener::__accept()
+int TCPListener::__accept(sockaddr_in & __client_address)
 {
     socklen_t clientSize = sizeof(__client_address);
-    
+
     // __client_socket = accept(__socket, NULL, NULL);
-    __client_socket = accept(__socket, 
+    int __client_socket = accept(__socket, 
                             reinterpret_cast<sockaddr *>(&__client_address), 
                             &clientSize);
-
-    if (__client_socket == NetworkConnectStatus::Failed)
-    {
-        std::cerr << "Problem with client connecting!" << std::endl;
-        return false;
-    }
-
-    __print_clien_info();
-    return true;
+    return __client_socket;
 }
 
-void TCPListener::__print_clien_info()
+void TCPListener::__print_client_info(ClientPacket &__client_packet, sockaddr_in __client_address)
 {
     char host[NI_MAXHOST] = {'\0'};
     char service[NI_MAXSERV] = {'\0'};
@@ -131,7 +124,7 @@ void TCPListener::__print_clien_info()
                                 0
                                 );
 
-    if (result == NetworkConnectStatus::Succeeded)
+    if (result == 0)
     {
         std::cout << host << " connected on " << service << std::endl;
     }
@@ -140,49 +133,434 @@ void TCPListener::__print_clien_info()
         inet_ntop(AF_INET, &__client_address.sin_addr, host, NI_MAXHOST);
         std::cout << host << " connected on " << ntohs(__client_address.sin_port) << std::endl;
     }
-
+    __client_packet.host = host;
+    __client_packet.service = service;
 }
 
-int TCPListener::__recv()
+bool TCPListener::__testing(int __client_socket)
 {
-    return recv(__client_socket, &__buf, sizeof(__buf), 0);
+    // memset(__buf, 0, BUFFER_SIZE);
+    __buf.clear();
+    __buf.resize(BUFFER_SIZE);
+    int bytesRecv = __recv(__client_socket);
+    // __buf.resize(bytesRecv);
+    // std::string response = std::string(__buf, 0, bytesRecv);
+    std::string response(__buf.begin(), __buf.begin() + bytesRecv);
+
+    __check(bytesRecv, "There was a connection issue!");
+
+    if (bytesRecv == 0)
+    {
+        std::cout << "The client disconnected" << std::endl;
+        return false;
+    }
+    std::cout << response;
+    // send welcome message
+    __send(__client_socket, __header.data(), __header.size());
+    return true;
 }
 
-void TCPListener::__send(char *msg, int len)
+int TCPListener::__recv(int __client_socket)
+{
+    // return recv(__client_socket, &__buf, sizeof(__buf), 0);
+    return recv(__client_socket, __buf.data(), __buf.size(), 0);
+}
+
+void TCPListener::__send(int __client_socket, char *msg, int len)
 {
     send(__client_socket, msg, len, 0);
 }
 
-void TCPListener::__run()
+bool TCPListener::handle_connection(ClientPacket __client_packet)
 {
     // send and receive
-    while (true)
+    // while (true)
     {
-        // clear the buffer
-        memset(__buf, 0, 4096);
-        // wait for the message
-        int bytesRecv = __recv();
+        __buf.clear();
+        __buf.resize(BUFFER_SIZE);
 
-        if (bytesRecv == NetworkConnectStatus::Failed)
-        {
-            std::cerr << "There was a connection issue!" << std::endl;
-            break;
-        }
+        // clear the buffer
+        // memset(__buf, 0, BUFFER_SIZE);
+        int bytesRecv = __recv(__client_packet.__client_socket);
+        // __buf.resize(bytesRecv);
+
+        if (!__check(bytesRecv, "There was a connection issue!")) return false;
+
         if (bytesRecv == 0)
         {
             std::cout << "The client disconnected" << std::endl;
-            break;
+            return false;
         }
 
-        std::string response = std::string(__buf, 0, bytesRecv);
+        // std::string response = std::string(__buf, 0, bytesRecv);
+        std::string response(__buf.begin(), __buf.begin() + bytesRecv);
 
-        // display message
-        std::cout << "Received: " << std::string(__buf, 0, bytesRecv);
-        if (response.compare("Close connection") == 0) break; 
+        RESPONSE_STATUS response_status = __processing(__client_packet, response);
 
-        // resend message
-        __send(__buf, bytesRecv + 1);
+        if (response_status == RESPONSE_STATUS::quit)
+        {
+            __send(__client_packet.__client_socket, std::string("Closing connection, bye\r\n").data(), 26);
+            return false;
+        }
+        else if (response_status == RESPONSE_STATUS::blank)
+        {
+            __send(__client_packet.__client_socket, std::string("Syntax error\r\n").data(), 15);
+        }
+        else if (response_status == RESPONSE_STATUS::key_notfound)
+        {
+            __send(__client_packet.__client_socket, std::string("KEY NOTFOUND\r\n").data(), 15);
+        }
+        else if (response_status == RESPONSE_STATUS::key_existed)
+        {
+            __send(__client_packet.__client_socket, std::string("KEY EXISTED\r\n").data(), 14);
+        }
+        // else if (response_status == RESPONSE_STATUS::normal)
+        else
+        {
+            __send(__client_packet.__client_socket, std::string("Command succeeded\r\n").data(), 20);
+        }
     }
-    // close the socket
-    close(__client_socket);
+    return true;
+    // close(__client_socket);
+}
+
+bool FD_IS_ANY_SET(fd_set const *fdset)
+{
+    static fd_set empty;     // initialized to 0 -> empty
+    return memcmp(fdset, &empty, sizeof(fd_set)) != 0;
+}
+
+void TCPListener::__run()
+{
+    // std::vector<int> __client_sockets(MAX_CLIENTS, 0);
+
+    std::array<ClientPacket, MAX_CLIENTS> __client_packets;
+    ClientPacket __tmp_packet;
+
+    for (auto &val:__client_packets)
+        val.__client_socket = 0;
+
+    int STD_INPUT = 1;
+    fd_set read_sockets;
+    FD_SET(STD_INPUT, &read_sockets);
+
+    int max_socket_so_far, __tmp_socket, __new_socket;
+
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+
+    std::cout << "Listening, waiting for connections . . .\n";
+
+    // max_socket_so_far = ([](int x, int y) -> int
+    // {
+    //     return x > y ? x:y;
+    // }, __socket, __udp_socket) + 1;
+
+    while (!__close_server_bit)
+    {
+        // initialize
+        FD_ZERO(&read_sockets);
+        FD_SET(__socket, &read_sockets);
+        // timeout.tv_sec = 0;
+        // timeout.tv_usec = 50;
+        max_socket_so_far = __socket;
+
+        for (int i = 0; i < MAX_CLIENTS; ++i)
+        {
+            __tmp_socket = __client_packets[i].__client_socket;
+
+            if (__tmp_socket > 0)
+            {
+                std::cout << "[FD_SET]: " << __tmp_socket << std::endl;
+                FD_SET(__tmp_socket, &read_sockets);
+            }
+
+            if (__tmp_socket > max_socket_so_far)
+                max_socket_so_far = __tmp_socket;
+        }
+
+        // selecting
+        if (select(max_socket_so_far + 1, &read_sockets, NULL, NULL, NULL) < 0)
+        {
+            std::cerr << "[Select error]" << std::endl;
+            // break;
+            exit(EXIT_FAILURE);
+        }
+        std::cout << "[max_socket_so_far]: " << max_socket_so_far << std::endl;
+        
+        // handling socket from main
+        if (FD_ISSET(__socket, &read_sockets))
+        {
+            // this is a new connection
+            // accept the call
+            sockaddr_in __client_address;
+            __new_socket = __accept(__client_address);
+            std::cout << "[Accepted]: " << __new_socket << std::endl;
+            if (!__check(__new_socket, "Problem with client connecting!"))
+                continue;
+            ClientPacket __new_packet;
+            __new_packet.__client_socket = __new_socket;
+            __print_client_info(__new_packet, __client_address);
+
+            // try to communicate to test the network
+            if(!__testing(__new_socket)) return;
+
+            for (int i = 0; i < MAX_CLIENTS; ++i)
+            {
+                if (__client_packets[i].__client_socket == 0)
+                {
+                    __client_packets[i] = __new_packet;
+                    std::cout << "[Adding socket]: " << __new_socket << std::endl;
+                    break;
+                }
+            }
+        }
+
+        // std::string __getline;
+        // std::getline(std::cin, __getline);
+        // if (__getline == "QUIT")
+        //     close(__socket);
+
+        // handling socket from clients
+        for (int i = 0; i < max_socket_so_far; ++i)
+        {
+            __tmp_packet = __client_packets[i];
+
+            if (FD_ISSET(__tmp_packet.__client_socket, &read_sockets))
+            {
+                std::cout << "[Handling]: " << __tmp_packet.__client_socket << std::endl;
+                if (!handle_connection(__tmp_packet))
+                {
+                    std::cout << "[Disconnecting host]: " << __tmp_packet.__client_socket << std::endl;
+                    close(__tmp_packet.__client_socket);
+                    __client_packets[i].__client_socket = 0;
+                }
+            }
+            else
+            {
+                std::cout << "[Not Handling]: " << __tmp_packet.__client_socket << std::endl;
+            }
+        }
+    }
+    std::cout << "[SERVER CLOSING]" << std::endl;
+    close(__socket);
+}
+
+RESPONSE_STATUS TCPListener::__processing(ClientPacket __client_packet, std::string response)
+{
+    std::cout << "Received: \"" << response << "\"";
+    std::cout << "Size of response = " << response.size() << std::endl;
+
+    response.pop_back();
+    response.pop_back();
+
+    std::vector<std::string> __argv = get_argv(response, ' ');
+    int __argc = __argv.size();
+    // std::cout << "Number of arguments = " << __argc << std::endl;
+
+    // check argv
+    if (__argc < 1)
+    {
+        return RESPONSE_STATUS::blank;
+    }
+
+
+    switch(ChoiceClass::hashTheChoice(__argv[0]))
+    {
+        case menuChoice::quit:
+            return RESPONSE_STATUS::quit;
+        case menuChoice::help:
+            __send(__client_packet.__client_socket, ChoiceClass::getMenu().data(), ChoiceClass::getMenu().size());
+            return RESPONSE_STATUS::normal;
+        case menuChoice::get:
+            if (__argc != 2)
+                return RESPONSE_STATUS::blank;
+            if (!__get(__client_packet.__client_socket, __argv[1]))
+                return RESPONSE_STATUS::key_notfound;
+            break;
+        case menuChoice::put:
+            if (__argc != 3)
+                return RESPONSE_STATUS::blank;
+            if (!__put(__client_packet, __argv[1], __argv[2]))
+                return RESPONSE_STATUS::key_existed;
+            break;
+        case menuChoice::del:
+            if (__argc != 2)
+                return RESPONSE_STATUS::blank;
+            if (!__del(__client_packet, __argv[1]))
+                return RESPONSE_STATUS::key_notfound;
+            break;
+        case menuChoice::getfile:
+            if (__argc != 2)
+                return RESPONSE_STATUS::blank;
+            if (!__getfile(__client_packet.__client_socket, __argv[1]))
+                return RESPONSE_STATUS::file_notfound;
+            break;
+        case menuChoice::putfile:
+            if (__argc != 2)
+                return RESPONSE_STATUS::blank;
+            if (!__putfile(__client_packet, __argv[1]))
+                return RESPONSE_STATUS::file_uploadfailed;
+            break;
+        case menuChoice::delfile:
+            if (__argc != 2)
+                return RESPONSE_STATUS::blank;
+            if (!__delfile(__client_packet, __argv[1]))
+                return RESPONSE_STATUS::file_notfound;
+            break;
+        case menuChoice::secretcommand:
+            if (__argc != 4)
+                return RESPONSE_STATUS::blank;
+            if (!__secretcommand(__client_packet, __argv[1], __argv[2],  __argv[3]))
+                return RESPONSE_STATUS::blank;
+            break;
+        case menuChoice::wrong:
+            return RESPONSE_STATUS::blank;
+            break;
+    }
+        
+    return RESPONSE_STATUS::normal;
+}
+
+std::vector<std::string> TCPListener::get_argv(std::string big_string, char split)
+{
+    std::string temp_string;
+    std::vector<std::string> __vector;
+    std::stringstream ss(big_string);
+    while (std::getline(ss, temp_string, split))
+        __vector.push_back(temp_string);
+    
+    // for (auto &each:__vector)
+    //     for (std::string::iterator it = each.begin(); it != each.end(); it++)
+    //         if (!isgraph((*it)))
+    //             each.erase(it + 1);
+    return __vector;
+}
+
+bool TCPListener::__secretcommand(ClientPacket __client_packet, std::string user, std::string passwd, std::string secretcommand)
+{
+    /*
+        COMMAND LIST:
+            CLOSE: close server
+    */
+    std::unordered_map<std::string, std::string> __listOfAdmin;
+    
+    __listOfAdmin = {
+        {"admin", "socketserver$2022"},
+        };
+
+    if (__listOfAdmin.count(user) <= 0) return false;
+    for (auto __admin:__listOfAdmin)
+    {
+        if (__admin.first == user && __admin.second != passwd)
+        {
+            return false;
+        }
+    }
+
+    if (SecretChoice::hashTheChoice(secretcommand) == SecretChoice::SECRETCOMMAND::CLOSE)
+    {
+        std::cout << "Closing signal received" << std::endl;
+        __send(__client_packet.__client_socket, std::string("Sending close signal to server\r\n").data(), 33);
+        __close_server_bit = true;
+    }
+
+    return true;
+}
+
+bool TCPListener::__get(int __client_socket, std::string key)
+{
+    if (__database.empty()) return false;
+    if (__database.count(key) == 0) return false;
+
+    __send(__client_socket, (__database[key].second + "\r\n").data(), __database[key].second.size() + 2);
+    return true;
+}
+
+bool TCPListener::__put(ClientPacket __client_packet, std::string key, std::string val)
+{
+    if (__database.count(key) > 0) return false;
+    std::pair<ClientPacket, std::string> __pair;
+    __pair.first = __client_packet;
+    __pair.second = val;
+    __database[key] = __pair;
+    return true;
+}
+
+bool TCPListener::__del(ClientPacket __client_packet, std::string key)
+{
+    if (__database.empty()) return false;
+    for (auto author:__database)
+    {
+        if (author.first == key)
+        {
+            if (author.second.first.host != __client_packet.host)
+            {
+                __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
+                return false;
+            }
+            if (author.second.first.service != __client_packet.service)
+            {
+                __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
+                return false;
+            }
+            break;
+        }
+    }
+
+    return __database.erase(key);
+}
+
+/*
+
+
+
+                                FILE STUFF
+
+
+
+*/
+
+
+bool TCPListener::__getfile(int __client_socket, std::string filename)
+{
+    // if (__database.empty()) return false;
+    // if (__database.count(filename) == 0) return false;
+
+    // __send(__client_socket, (__database[key].second + "\r\n").data(), __database[key].second.size() + 2);
+    return true;
+}
+
+bool TCPListener::__putfile(ClientPacket __client_packet, std::string filename)
+{
+    // if (__database.count(key) > 0) return false;
+    // std::pair<ClientPacket, std::string> __pair;
+    // __pair.first = __client_packet;
+    // __pair.second = val;
+    // __database[key] = __pair;
+    return true;
+}
+
+bool TCPListener::__delfile(ClientPacket __client_packet, std::string filename)
+{
+    // if (__database.empty()) return false;
+    // for (auto author:__database)
+    // {
+    //     if (author.first == key)
+    //     {
+    //         if (author.second.first.host != __client_packet.host)
+    //         {
+    //             __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
+    //             return false;
+    //         }
+    //         if (author.second.first.service != __client_packet.service)
+    //         {
+    //             __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
+    //             return false;
+    //         }
+    //         break;
+    //     }
+    // }
+
+    return true;
 }

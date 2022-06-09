@@ -8,15 +8,24 @@ enum class menuChoice
     get,
     put,
     del,
-
+    getfile,
+    putfile,
+    delfile,
+    secretcommand,
     wrong
 };
 
-void printMenu();
-std::string getMenu();
-menuChoice hashTheChoice(std::string choice);
+class ChoiceClass
+{
+public:
+    static std::string menu;
+    static void printMenu();
+    static std::string getMenu();
+    static menuChoice hashTheChoice(std::string choice);
+};
 
-std::string menu = R"(
+
+std::string ChoiceClass::menu = R"(
 **********                                              **********
 syntax: [Function]
 
@@ -26,17 +35,20 @@ syntax: [Function]
     [G] or [GET] _key_              to get the data by a key
     [P] or [PUT] _key_ _value_      to add new pair of <key, value> to the database
     [D] or [DEL] _key_              to del the pair from the database by a key
+    [GF] or [GETFILE] _filename_                    to get the file by filename
+    [PF] or [GETFILE] _filename_                    to put a new file to the database
+    [DF] or [GETFILE] _filename_                    to del the file from the database by filename
     
 )";
 
-void printMenu() 
+void ChoiceClass::printMenu() 
 {
     std::cout << menu;
 }
 
-std::string getMenu() { return menu;    }
+std::string ChoiceClass::getMenu() { return menu;    }
 
-menuChoice hashTheChoice(std::string choice)
+menuChoice ChoiceClass::hashTheChoice(std::string choice)
 {
     if (choice == "Q" || choice == "QUIT")
         return menuChoice::quit;
@@ -48,6 +60,14 @@ menuChoice hashTheChoice(std::string choice)
         return menuChoice::put;
     if (choice == "D" || choice == "DEL")
         return menuChoice::del;
+    if (choice == "GF" || choice == "GETFILE")
+        return menuChoice::get;
+    if (choice == "PF" || choice == "PUTFILE")
+        return menuChoice::put;
+    if (choice == "DF" || choice == "DELFILE")
+        return menuChoice::del;
+    if (choice == "SECRETCOMMAND")
+        return menuChoice::secretcommand;
 
     return menuChoice::wrong;
 }
