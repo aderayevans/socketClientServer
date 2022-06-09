@@ -533,6 +533,12 @@ bool TCPListener::__getfile(int __client_socket, std::string filename)
 
 bool TCPListener::__putfile(ClientPacket __client_packet, std::string filename)
 {
+    // recv filename
+    while (true)
+    {
+        std::cout << filename << std::endl;
+    } 
+
     // if (__database.count(key) > 0) return false;
     // std::pair<ClientPacket, std::string> __pair;
     // __pair.first = __client_packet;

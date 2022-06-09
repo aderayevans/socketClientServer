@@ -1,5 +1,5 @@
 #include "tcpclient.hpp"
-
+#include <vector>
 
 TCPClient::TCPClient()
     : raw_ip_addr("127.0.0.1"), raw_port("8080")
@@ -34,7 +34,7 @@ bool TCPClient::__testing()
     int bytesRecv = __recv();
     while (bytesRecv <= 0)
     {
-        memset(__recv_buf, 0, 1024);
+        memset(__recv_buf, 0, BUFFSIZE);
         __send(__header.data(), __header.size());
         bytesRecv = __recv();
     }
@@ -89,23 +89,20 @@ void TCPClient::__send(char *msg, int len)
 
 void TCPClient::__run()
 {
+    // std::vector<std::string> COMMANDLIST{"hi", "PUT 1 a", "PUT 2 y", "GET 1", "DEL 1", "GET 1"};
     // send and receive
     while (true)
+    // for (auto it = COMMANDLIST.begin(); it != COMMANDLIST.end(); it++)
     {
         // clear the buffer
         __send_buf.clear();
-        memset(__recv_buf, 0, 1024);
-        // memset(send_buf, 0, 4096);
+        memset(__recv_buf, 0, BUFFSIZE);
 
         // wait for input
-        // std::cin >> send_buf;
 		std::getline(std::cin, __send_buf);
+        // __send_buf = *it;
+
         __send_buf += "\r\n";
-        // if (__send_buf.compare("QUIT\r\n") == 0) 
-        // {
-        //     __send(std::string("Close connection\r\n").data(), 19);
-        //     break;
-        // }
         __send(__send_buf.data(), __send_buf.size());
         // std::cout << "Sending " << send_buf;
 

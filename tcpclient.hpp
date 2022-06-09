@@ -21,6 +21,8 @@ enum NetworkConnectStatus {
     Failed = -1
 };
 
+const int BUFFSIZE = 1024;
+
 class TCPClient
 {
 public:
@@ -40,7 +42,7 @@ private:
     std::string __header = "GET / HTTP/1.1\r\n\r\n";
     sockaddr_in __remote_address;
     int __socket;
-    char __recv_buf[4096] = {'\0'};
+    char __recv_buf[BUFFSIZE] = {'\0'};
     std::string __send_buf;
 };
 

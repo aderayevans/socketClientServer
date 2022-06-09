@@ -61,11 +61,11 @@ menuChoice ChoiceClass::hashTheChoice(std::string choice)
     if (choice == "D" || choice == "DEL")
         return menuChoice::del;
     if (choice == "GF" || choice == "GETFILE")
-        return menuChoice::get;
+        return menuChoice::getfile;
     if (choice == "PF" || choice == "PUTFILE")
-        return menuChoice::put;
+        return menuChoice::putfile;
     if (choice == "DF" || choice == "DELFILE")
-        return menuChoice::del;
+        return menuChoice::delfile;
     if (choice == "SECRETCOMMAND")
         return menuChoice::secretcommand;
 
