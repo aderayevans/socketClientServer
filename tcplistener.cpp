@@ -1,5 +1,4 @@
 #include "tcplistener.hpp"
-#include <sstream>
 #include <algorithm>
 #include <iterator>
 #include "menuchoice.hpp"
@@ -139,9 +138,9 @@ void TCPListener::__print_client_info(ClientPacket &__client_packet, sockaddr_in
 
 bool TCPListener::__testing(int __client_socket)
 {
-    // memset(__buf, 0, BUFFER_SIZE);
+    // memset(__buf, 0, BUFFSIZE);
     __buf.clear();
-    __buf.resize(BUFFER_SIZE);
+    __buf.resize(BUFFSIZE);
     int bytesRecv = __recv(__client_socket);
     // __buf.resize(bytesRecv);
     // std::string response = std::string(__buf, 0, bytesRecv);
@@ -162,7 +161,6 @@ bool TCPListener::__testing(int __client_socket)
 
 int TCPListener::__recv(int __client_socket)
 {
-    // return recv(__client_socket, &__buf, sizeof(__buf), 0);
     return recv(__client_socket, __buf.data(), __buf.size(), 0);
 }
 
@@ -171,57 +169,100 @@ void TCPListener::__send(int __client_socket, char *msg, int len)
     send(__client_socket, msg, len, 0);
 }
 
-bool TCPListener::handle_connection(ClientPacket __client_packet)
+bool TCPListener::handle_connection(ClientPacket& __client_packet)
 {
-    // send and receive
-    // while (true)
+    std::cout << "Begin to handle connection" << std::endl;
+    bool __client_READINGFILE_BIT = false, __client_WRITINGFILE_BIT = false;
+    
+    if (__io_map.count(__client_packet.__client_socket) > 0)
     {
-        __buf.clear();
-        __buf.resize(BUFFER_SIZE);
+        __client_READINGFILE_BIT = __io_map[__client_packet.__client_socket]->READINGFILE_BIT;
+        __client_WRITINGFILE_BIT = __io_map[__client_packet.__client_socket]->WRITINGFILE_BIT;
+    }
 
-        // clear the buffer
-        // memset(__buf, 0, BUFFER_SIZE);
+    if (__client_READINGFILE_BIT)
+    {
         int bytesRecv = __recv(__client_packet.__client_socket);
-        // __buf.resize(bytesRecv);
-
-        if (!__check(bytesRecv, "There was a connection issue!")) return false;
-
-        if (bytesRecv == 0)
-        {
-            std::cout << "The client disconnected" << std::endl;
-            return false;
-        }
-
-        // std::string response = std::string(__buf, 0, bytesRecv);
         std::string response(__buf.begin(), __buf.begin() + bytesRecv);
+        std::cout << "[RECV]: " << response;
 
-        RESPONSE_STATUS response_status = __processing(__client_packet, response);
 
-        if (response_status == RESPONSE_STATUS::quit)
-        {
-            __send(__client_packet.__client_socket, std::string("Closing connection, bye\r\n").data(), 26);
-            return false;
-        }
-        else if (response_status == RESPONSE_STATUS::blank)
-        {
-            __send(__client_packet.__client_socket, std::string("Syntax error\r\n").data(), 15);
-        }
-        else if (response_status == RESPONSE_STATUS::key_notfound)
-        {
-            __send(__client_packet.__client_socket, std::string("KEY NOTFOUND\r\n").data(), 15);
-        }
-        else if (response_status == RESPONSE_STATUS::key_existed)
-        {
-            __send(__client_packet.__client_socket, std::string("KEY EXISTED\r\n").data(), 14);
-        }
-        // else if (response_status == RESPONSE_STATUS::normal)
-        else
-        {
-            __send(__client_packet.__client_socket, std::string("Command succeeded\r\n").data(), 20);
-        }
+
+        // std::cout << "Reading file chunks" << std::endl;
+        __read_file_chunk(__client_packet);
+        return true;
+    }
+    else if (__client_WRITINGFILE_BIT)
+    {
+        // std::cout << "Writing file chunks" << std::endl;
+        __write_file_chunk(__client_packet);
+        return true;
+    }
+
+
+
+    // send and receive
+    __buf.clear();
+    __buf.resize(BUFFSIZE);
+
+    // clear the buffer
+    // memset(__buf, 0, BUFFSIZE);
+    int bytesRecv = __recv(__client_packet.__client_socket);
+    // __buf.resize(bytesRecv);
+
+        
+    if (!__check(bytesRecv, "There was a connection issue!")) return false;
+    
+    if (bytesRecv == 0)
+    {
+        std::cout << "The client disconnected" << std::endl;
+        return false;
+    }
+    
+    std::string response(__buf.begin(), __buf.begin() + bytesRecv);
+    
+
+    RESPONSE_STATUS response_status = __processing(__client_packet, response);
+    
+    if (response_status == RESPONSE_STATUS::quit)
+    {
+        __send(__client_packet.__client_socket, std::string("Closing connection, bye\r\n").data(), 26);
+        return false;
+    }
+    else if (response_status == RESPONSE_STATUS::blank)
+    {
+        __send(__client_packet.__client_socket, std::string("Syntax error\r\n").data(), 15);
+    }
+    else if (response_status == RESPONSE_STATUS::key_notfound)
+    {
+        __send(__client_packet.__client_socket, std::string("KEY NOTFOUND\r\n").data(), 15);
+    }
+    else if (response_status == RESPONSE_STATUS::key_existed)
+    {
+        __send(__client_packet.__client_socket, std::string("KEY EXISTED\r\n").data(), 14);
+    }
+    else if (response_status == RESPONSE_STATUS::file_notfound)
+    {
+        __send(__client_packet.__client_socket, std::string("File not found\r\n").data(), 17);
+    }
+    else if (response_status == RESPONSE_STATUS::file_uploadfailed)
+    {
+        __send(__client_packet.__client_socket, std::string("File upload failed\r\n").data(), 21);
+    }
+    else if (response_status == RESPONSE_STATUS::file_downloading)
+    {
+        // __send(__client_packet.__client_socket, std::string("File downloading\r\n").data(), 19);
+    }
+    else if (response_status == RESPONSE_STATUS::file_uploading)
+    {
+        // __send(__client_packet.__client_socket, std::string("File uploading\r\n").data(), 17);
+    }
+    // else if (response_status == RESPONSE_STATUS::normal)
+    else
+    {
+        __send(__client_packet.__client_socket, std::string("Command succeeded\r\n").data(), 20);
     }
     return true;
-    // close(__client_socket);
 }
 
 bool FD_IS_ANY_SET(fd_set const *fdset)
@@ -240,9 +281,7 @@ void TCPListener::__run()
     for (auto &val:__client_packets)
         val.__client_socket = 0;
 
-    int STD_INPUT = 1;
     fd_set read_sockets;
-    FD_SET(STD_INPUT, &read_sockets);
 
     int max_socket_so_far, __tmp_socket, __new_socket;
 
@@ -346,13 +385,15 @@ void TCPListener::__run()
     close(__socket);
 }
 
-RESPONSE_STATUS TCPListener::__processing(ClientPacket __client_packet, std::string response)
+RESPONSE_STATUS TCPListener::__processing(ClientPacket &__client_packet, std::string response)
 {
-    std::cout << "Received: \"" << response << "\"";
+    // std::cout << "Received: \"" << response << "\"";
+    // std::cout << "Size of response = " << response.size() << std::endl;
+    std::cout << "Processing response" << std::endl;
+    response.pop_back();
+    response.pop_back();
+    std::cout << "Received: \"" << response << "\"" << std::endl;
     std::cout << "Size of response = " << response.size() << std::endl;
-
-    response.pop_back();
-    response.pop_back();
 
     std::vector<std::string> __argv = get_argv(response, ' ');
     int __argc = __argv.size();
@@ -393,14 +434,16 @@ RESPONSE_STATUS TCPListener::__processing(ClientPacket __client_packet, std::str
         case menuChoice::getfile:
             if (__argc != 2)
                 return RESPONSE_STATUS::blank;
-            if (!__getfile(__client_packet.__client_socket, __argv[1]))
+            if (!__downloadfile(__client_packet, __argv[1]))
                 return RESPONSE_STATUS::file_notfound;
+            else return RESPONSE_STATUS::file_downloading;
             break;
         case menuChoice::putfile:
-            if (__argc != 2)
+            if (__argc != 3)
                 return RESPONSE_STATUS::blank;
-            if (!__putfile(__client_packet, __argv[1]))
+            if (!__uploadfile(__client_packet, __argv[1], __argv[2]))
                 return RESPONSE_STATUS::file_uploadfailed;
+            else return RESPONSE_STATUS::file_uploading;
             break;
         case menuChoice::delfile:
             if (__argc != 2)
@@ -490,16 +533,16 @@ bool TCPListener::__put(ClientPacket __client_packet, std::string key, std::stri
 bool TCPListener::__del(ClientPacket __client_packet, std::string key)
 {
     if (__database.empty()) return false;
-    for (auto author:__database)
+    for (auto json:__database)
     {
-        if (author.first == key)
+        if (json.first == key)
         {
-            if (author.second.first.host != __client_packet.host)
+            if (json.second.first.host != __client_packet.host)
             {
                 __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
                 return false;
             }
-            if (author.second.first.service != __client_packet.service)
+            if (json.second.first.service != __client_packet.service)
             {
                 __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
                 return false;
@@ -522,51 +565,123 @@ bool TCPListener::__del(ClientPacket __client_packet, std::string key)
 */
 
 
-bool TCPListener::__getfile(int __client_socket, std::string filename)
+bool TCPListener::__downloadfile(ClientPacket &__client_packet, std::string filename)
 {
-    // if (__database.empty()) return false;
-    // if (__database.count(filename) == 0) return false;
+    IOHandler *__ioHandler = new IOHandler();
+    if (!__ioHandler->open_to_read(filename))
+        return false;
 
-    // __send(__client_socket, (__database[key].second + "\r\n").data(), __database[key].second.size() + 2);
+    // get length
+    long length = __ioHandler->get_file_length();
+
+    std::cout << "Sending length: " << length << std::endl;
+
+    std::string msg = "Length " + std::to_string(length) + "\r\n";
+    __send(__client_packet.__client_socket, msg.data(), msg.size());
+
+    __io_map[__client_packet.__client_socket] = __ioHandler;
+
     return true;
 }
 
-bool TCPListener::__putfile(ClientPacket __client_packet, std::string filename)
+bool TCPListener::__uploadfile(ClientPacket &__client_packet, std::string filename, std::string len_str)
 {
-    // recv filename
-    while (true)
+    IOHandler *__ioHandler = new IOHandler();
+
+    __send(__client_packet.__client_socket, std::string("Start to putting file\r\n").data(), 24 );
+    
+    if (!__ioHandler->open_to_write("new_" + filename))
+        return false;
+
+    __file_database[&__client_packet] = std::string("new_") + filename;
+
+    __ioHandler->set_file_size(len_str);
+
+    __io_map[__client_packet.__client_socket] = __ioHandler;
+
+    return true;
+}
+
+bool TCPListener::__delfile(ClientPacket &__client_packet, std::string filename)
+{
+    std::cout << "[filename]: " << filename << std::endl;
+    if (__file_database.empty()) return false;
+    for (auto file:__file_database)
     {
-        std::cout << filename << std::endl;
-    } 
+        std::cout << file.first->__client_socket << ": " << file.second << std::endl;
+        if (file.second == filename)
+        {
+            if (file.first->host != __client_packet.host)
+            {
+                __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
+                return false;
+            }
+            if (file.first->service != __client_packet.service)
+            {
+                __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
+                return false;
+            }
+            break;
+        }
+    }
 
-    // if (__database.count(key) > 0) return false;
-    // std::pair<ClientPacket, std::string> __pair;
-    // __pair.first = __client_packet;
-    // __pair.second = val;
-    // __database[key] = __pair;
+    if(std::filesystem::remove(filename))
+        __send(__client_packet.__client_socket, std::string("File Deleted Successfully!\r\n").data(), 29 );
+    else
+        return false;
     return true;
 }
 
-bool TCPListener::__delfile(ClientPacket __client_packet, std::string filename)
+void TCPListener::__write_file_chunk(ClientPacket &__client_packet)
 {
-    // if (__database.empty()) return false;
-    // for (auto author:__database)
-    // {
-    //     if (author.first == key)
-    //     {
-    //         if (author.second.first.host != __client_packet.host)
-    //         {
-    //             __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
-    //             return false;
-    //         }
-    //         if (author.second.first.service != __client_packet.service)
-    //         {
-    //             __send(__client_packet.__client_socket, std::string("You mustn't delete other data!!!\r\n").data(), 35);
-    //             return false;
-    //         }
-    //         break;
-    //     }
-    // }
+    __io_map[__client_packet.__client_socket]->buffer.clear();
+    __io_map[__client_packet.__client_socket]->buffer.resize(BUFFSIZE);
+
+    int bytesRecv = recv(__client_packet.__client_socket, __io_map[__client_packet.__client_socket]->buffer.data(), __io_map[__client_packet.__client_socket]->buffer.size(), 0);
+
+    __io_map[__client_packet.__client_socket]->write_file(bytesRecv);
+
+    if (__io_map[__client_packet.__client_socket]->is_finish_writing())
+    {
+        std::string msg = "Completely written the file\r\n";
+        std::cout << msg;
+        __send(__client_packet.__client_socket, msg.data(), msg.size());
+
+        __io_map[__client_packet.__client_socket]->close_file();
+        __io_map.erase( __client_packet.__client_socket );
+    }
+    else
+    {
+        std::string msg = "Received " + std::to_string(bytesRecv) + "\r\n";
+        __send(__client_packet.__client_socket, msg.data(), msg.size());
+    }
+}
+
+bool TCPListener::__read_file_chunk(ClientPacket &__client_packet)
+{
+    if (__io_map[__client_packet.__client_socket]->read_file())
+    {
+        // std::cout << ifs.gcount() << std::endl;
+        __io_map[__client_packet.__client_socket]->buffer.resize( BUFFSIZE );
+        std::cout << "Sending size: " << BUFFSIZE << std::endl;
+        __send(__client_packet.__client_socket, reinterpret_cast<char*>(__io_map[__client_packet.__client_socket]->buffer.data()), __io_map[__client_packet.__client_socket]->buffer.size());
+        __io_map[__client_packet.__client_socket]->buffer.resize( BUFFSIZE );
+    }
+    else
+    {
+        // std::cout << leftbytes << std::endl;
+        if (__io_map[__client_packet.__client_socket]->leftbytes > 0)
+        {
+            __io_map[__client_packet.__client_socket]->read_file(__io_map[__client_packet.__client_socket]->leftbytes);
+            std::cout << "Sending size: " << __io_map[__client_packet.__client_socket]->leftbytes << std::endl;
+            __send(__client_packet.__client_socket, reinterpret_cast<char*>(__io_map[__client_packet.__client_socket]->buffer.data()), __io_map[__client_packet.__client_socket]->leftbytes);
+            __recv(__client_packet.__client_socket);
+        }
+        std::string msg = "Completed sending files\r\n";
+        std::cout << msg;
+        __send(__client_packet.__client_socket, msg.data(), msg.size());
+        __io_map[__client_packet.__client_socket]->close_file();
+    }
 
     return true;
 }

@@ -3,10 +3,13 @@
 
 #include <iostream>
 #include <string>
+#include <string.h>
 #include <vector>
 #include <array>
-#include <string.h>
 #include <unordered_map>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -19,7 +22,7 @@
 // for inet_pton, convert the ip addr format
 #include <arpa/inet.h>
 
-
+#include "iohandler.hpp"
 
 const int SOCKETERROR = -1;
 
@@ -31,6 +34,8 @@ enum class RESPONSE_STATUS
     key_existed,
     file_notfound,
     file_uploadfailed,
+    file_downloading,
+    file_uploading,
     normal
 };
 
@@ -54,18 +59,11 @@ public:
 
 struct ClientPacket
 {
-    // void operator = (const ClientPacket A)
-    // {
-    //     __client_socket = A.__client_socket;
-    //     host = A.host;
-    //     service = A.service;
-    // }
     int __client_socket;
     std::string host;
     std::string service;
 };
 
-const int BUFFER_SIZE = 1024;
 const int MAX_CLIENTS = 100;
 
 class TCPListener
@@ -84,7 +82,7 @@ public:
     bool __listen();
     void __define_address();
     void __run();
-    bool handle_connection(ClientPacket);
+    bool handle_connection(ClientPacket&);
     int __accept(sockaddr_in &);
     int __recv(int);
     void __send(int, char*, int);
@@ -93,14 +91,16 @@ public:
 
     bool __testing(int);
     std::vector<std::string> get_argv(std::string, char);
-    RESPONSE_STATUS __processing(ClientPacket, std::string);
+    RESPONSE_STATUS __processing(ClientPacket&, std::string);
     bool __get(int, std::string);
     bool __put(ClientPacket, std::string, std::string);
     bool __del(ClientPacket, std::string);
     bool __secretcommand(ClientPacket, std::string, std::string, std::string);
-    bool __getfile(int, std::string);
-    bool __putfile(ClientPacket, std::string);
-    bool __delfile(ClientPacket, std::string);
+    bool __downloadfile(ClientPacket&, std::string);
+    bool __uploadfile(ClientPacket&, std::string, std::string);
+    bool __delfile(ClientPacket&, std::string);
+    void __write_file_chunk(ClientPacket&);
+    bool __read_file_chunk(ClientPacket&);
 
 private:
     const char* raw_port, * raw_ip_addr;
@@ -112,8 +112,11 @@ private:
     std::vector<char> __buf;
     // char __buf[BUFFER_SIZE] = {'\0'};
     std::unordered_map<std::string, std::pair<ClientPacket, std::string>> __database;
+    std::unordered_map<ClientPacket*, std::string> __file_database;
     timeval timeout;
+    std::unordered_map<int, IOHandler*> __io_map;
     bool __close_server_bit = false;
+    int header_size = 64;
 };
 
 #endif
