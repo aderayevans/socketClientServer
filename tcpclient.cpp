@@ -315,7 +315,7 @@ bool TCPClient::__write_file_chunk()
     else
     {
         std::string msg = "Received " + std::to_string(bytesRecv) + "\r\n";
-        std::cout << msg;
+        // std::cout << msg;
         __send(msg.data(), msg.size());
         return true;
     }

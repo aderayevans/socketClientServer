@@ -171,7 +171,7 @@ void TCPListener::__send(int __client_socket, char *msg, int len)
 
 bool TCPListener::handle_connection(ClientPacket& __client_packet)
 {
-    std::cout << "Begin to handle connection" << std::endl;
+    // std::cout << "Begin to handle connection" << std::endl;
     bool __client_READINGFILE_BIT = false, __client_WRITINGFILE_BIT = false;
     
     if (__io_map.count(__client_packet.__client_socket) > 0)
@@ -310,7 +310,7 @@ void TCPListener::__run()
 
             if (__tmp_socket > 0)
             {
-                std::cout << "[FD_SET]: " << __tmp_socket << std::endl;
+                // std::cout << "[FD_SET]: " << __tmp_socket << std::endl;
                 FD_SET(__tmp_socket, &read_sockets);
             }
 
@@ -325,7 +325,7 @@ void TCPListener::__run()
             // break;
             exit(EXIT_FAILURE);
         }
-        std::cout << "[max_socket_so_far]: " << max_socket_so_far << std::endl;
+        // std::cout << "[max_socket_so_far]: " << max_socket_so_far << std::endl;
         
         // handling socket from main
         if (FD_ISSET(__socket, &read_sockets))
@@ -367,7 +367,7 @@ void TCPListener::__run()
 
             if (FD_ISSET(__tmp_packet.__client_socket, &read_sockets))
             {
-                std::cout << "[Handling]: " << __tmp_packet.__client_socket << std::endl;
+                // std::cout << "[Handling]: " << __tmp_packet.__client_socket << std::endl;
                 if (!handle_connection(__tmp_packet))
                 {
                     std::cout << "[Disconnecting host]: " << __tmp_packet.__client_socket << std::endl;
@@ -375,10 +375,10 @@ void TCPListener::__run()
                     __client_packets[i].__client_socket = 0;
                 }
             }
-            else
-            {
-                std::cout << "[Not Handling]: " << __tmp_packet.__client_socket << std::endl;
-            }
+            // else
+            // {
+            //     std::cout << "[Not Handling]: " << __tmp_packet.__client_socket << std::endl;
+            // }
         }
     }
     std::cout << "[SERVER CLOSING]" << std::endl;
