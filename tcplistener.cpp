@@ -593,6 +593,8 @@ bool TCPListener::__uploadfile(ClientPacket &__client_packet, std::string filena
     if (!__ioHandler->open_to_write("new_" + filename))
         return false;
 
+    // std::vector pathsplit = get_argv(filename, '/');
+    // std::string newname = pathsplit[pathsplit.size() - 1];
     __file_database[&__client_packet] = std::string("new_") + filename;
 
     __ioHandler->set_file_size(len_str);

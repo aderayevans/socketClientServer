@@ -248,6 +248,8 @@ bool TCPClient::__downloadfile(std::string filename)
     std::string msg = "Recv file length, ready to read\r\n";
     __send(msg.data(), msg.size());
 
+    // std::vector pathsplit = get_argv(filename, '/');
+    // std::string newname = pathsplit[pathsplit.size() - 1];
     if (!__ioHandler->open_to_write("client_" + filename))
         return false;
     __ioHandler->set_file_size(__argv[1]);
