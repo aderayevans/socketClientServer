@@ -189,7 +189,7 @@ void TCPClient::__run()
             }
         }
         // std::cout << "Sending " << send_buf;
-        std::cout << "Sent, wait for receiving" << std::endl;
+        // std::cout << "Sent, wait for receiving" << std::endl;
 
         // wait for the message
         int bytesRecv = __recv();

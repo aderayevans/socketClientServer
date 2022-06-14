@@ -7,6 +7,7 @@
 #include <string>
 #include <string.h>
 #include <vector>
+#include <unistd.h>
 
 typedef unsigned char BYTE;
 const int BUFFSIZE = 1024;
@@ -41,7 +42,7 @@ struct IOHandler
     void close_file();
 
     void recal_file_left_size(int);
-    void update_bar(int);
+    void update_bar(int, long);
 
     bool is_finish_writing();
 };

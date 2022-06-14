@@ -80,8 +80,9 @@ void IOHandler::close_file()
     READINGFILE_BIT = false;
 }
 
-void IOHandler::update_bar(int percent)
+void IOHandler::update_bar(int percent, long bytes)
 {
+    fputs("\e[?25l", stdout);   //hide cursor
     int num = percent * PROGRESSBAR_LENGTH  / 100;
     std::cout << "\r[";
     for (int i = 0; i < num; ++i)
@@ -91,9 +92,12 @@ void IOHandler::update_bar(int percent)
     {
         std::cout << " ";
     }
-    std::cout << "] " << percent << "%";
+    std::cout << "] " << percent << "% (" << bytes << ")";
     if (percent == 100)
+    {
         std::cout << " Done\r\n";
+        fputs("\e[?25h", stdout);   //show cursor
+    }
 }
 
 void IOHandler::recal_file_left_size(int bytes)
@@ -103,7 +107,8 @@ void IOHandler::recal_file_left_size(int bytes)
     file_left_size -= bytes;
     if (file_left_size < 0) file_left_size = 0;
     double percent = ((double)(file_size - file_left_size)/file_size);
-    update_bar(percent*100);
+    update_bar(percent*100, file_size - file_left_size);
+    usleep(2000);
 }
 
 bool IOHandler::is_finish_writing()
